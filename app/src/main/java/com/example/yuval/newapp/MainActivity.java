@@ -8,10 +8,12 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.google.api.client.extensions.android.http.AndroidHttp;
@@ -35,12 +37,16 @@ public class MainActivity extends AppCompatActivity {
 
     private final String CLOUD_API_KEY = "AIzaSyDyp0yvPqn1MrJDGNpHkCSQCek5RsSW8oM";
 
+    private ProgressBar progressBar;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+
+        progressBar = (ProgressBar) findViewById(R.id.progress_bar);
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -72,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
         if (resultCode == RESULT_OK) {
             final Uri soundUri = data.getData();
 
+            showProgress(true);
             AsyncTask.execute(new Runnable() {
                 @Override
                 public void run() {
@@ -104,31 +111,37 @@ public class MainActivity extends AppCompatActivity {
                         SyncRecognizeResponse response = null;
                         try {
                             response = speechService.speech().syncrecognize(request).execute();
+
+                            // Extract transcript
+                            SpeechRecognitionResult result = response.getResults().get(0);
+                            final String transcript = result.getAlternatives().get(0)
+                                    .getTranscript();
+
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    TextView speechToTextResult =
+                                            (TextView) findViewById(R.id.text_view);
+                                    speechToTextResult.setText(transcript);
+                                }
+                            });
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-
-                        // Extract transcript
-                        SpeechRecognitionResult result = response.getResults().get(0);
-                        final String transcript = result.getAlternatives().get(0)
-                                .getTranscript();
-
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                TextView speechToTextResult =
-                                        (TextView) findViewById(R.id.speech_to_text_result);
-                                speechToTextResult.setText(transcript);
-                            }
-                        });
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
 
-
                     // More code here
+
+                    //TODO: This is probably not the best way to do it but it works for now.
+                    // You have to run on ui thread here because AsyncTasks run in background.
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            showProgress(false);
+                        }
+                    });
                 }
             });
         }
@@ -154,5 +167,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showProgress(boolean show) {
+        progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 }
